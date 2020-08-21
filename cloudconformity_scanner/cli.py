@@ -26,7 +26,7 @@ def main():
         exit(os.EX_CONFIG)
 
     parser = argparse.ArgumentParser(description="Scan CloudFormation template with CloudConformity")
-    parser.add_argument('template', nargs='?', default='template.yaml')
+    parser.add_argument('template', nargs='*', default='template.yaml')
     parser.add_argument('--account-id')
     parser.add_argument('--profile-id')
     parser.add_argument('--region', default='eu-west-1')
@@ -61,30 +61,17 @@ def main():
     if args.exclude_level:
         exclude_levels = args.exclude_level
 
-    scanner = TemplateScanner(api_key, region, exclude_levels=exclude_levels, exclude_rules=exclude_rules)
-    with open(args.template, 'r') as fh:
-        contents = fh.read()
-
-    bucketed_data = {}
-    for item in scanner.scan_template(contents, account_id, profile_id):
-        assert item.risk_level in RISK_LEVELS
-        if item.risk_level not in bucketed_data:
-            bucketed_data[item.risk_level] = []
-        bucketed_data[item.risk_level].append(item)
+    scanner = TemplateScanner(
+        api_key, region,
+        account_id=account_id, profile_id=profile_id,
+        exclude_levels=exclude_levels, exclude_rules=exclude_rules,
+    )
 
     failure_found = False
-    for risk_level in RISK_LEVELS:
-        if risk_level not in bucketed_data:
-            continue
-
-        failure_found = True
-        print(f"Found {risk_level} risk issues:")
-
-        findings = sorted(bucketed_data[risk_level], key=lambda x: x.line_number if x.line_number is not None else -1)
-        for finding in findings:
-            print(
-                f"- [{finding.rule_id}] Line {finding.line_number}: {finding.message} ({finding.rule_title}: {finding.status})")
-
+    for template_file in args.template:
+        template_failure = _scan_file(scanner, template_file)
+        if template_failure:
+            failure_found = True
     if failure_found:
         exit(1)
     exit(0)
@@ -106,14 +93,25 @@ class Finding:
 
 
 class TemplateScanner:
-    def __init__(self, api_key, cc_region, exclude_levels: Optional[List] = None, exclude_rules: Optional[List] = None):
+    def __init__(
+            self, api_key, cc_region,
+            account_id: Optional[str] = None, profile_id: Optional[str] = None,
+            exclude_levels: Optional[List] = None, exclude_rules: Optional[List] = None,
+    ):
         self.api_key = api_key
         self.cc_region = cc_region
+        self.account_id = account_id
+        self.profile_id = profile_id
         self.exclude_levels = exclude_levels if exclude_levels is not None else []
         self.exclude_rules = exclude_rules if exclude_rules is not None else []
 
-    def scan_template(self, template_contents: str, account_id: str = None, profile_id: str = None) -> Iterable[
-        Finding]:
+    def scan_template(
+            self, template_contents: str,
+            override_account_id: Optional[str] = None, override_profile_id: Optional[str] = None,
+    ) -> Iterable[Finding]:
+        account_id = override_account_id if override_account_id is not None else self.account_id
+        profile_id = override_profile_id if override_profile_id is not None else self.profile_id
+
         yaml = YAML()
         source: comments.CommentedMap = yaml.load(template_contents)
         response = requests.post(
@@ -191,6 +189,34 @@ class TemplateScanner:
         if resource.startswith('arn:aws:sns:us-east-1:123456789012'):
             return resource.split(':')[-1]
         return resource
+
+
+def _scan_file(scanner: TemplateScanner, template_file: str) -> bool:
+    with open(template_file, 'r') as fh:
+        contents = fh.read()
+
+    bucketed_data = {}
+    for item in scanner.scan_template(contents):
+        assert item.risk_level in RISK_LEVELS
+        if item.risk_level not in bucketed_data:
+            bucketed_data[item.risk_level] = []
+        bucketed_data[item.risk_level].append(item)
+
+    failure_found = False
+    for risk_level in RISK_LEVELS:
+        if risk_level not in bucketed_data:
+            continue
+
+        failure_found = True
+        print(f"[{template_file}] - Found {risk_level} risk issues:")
+
+        findings = sorted(bucketed_data[risk_level], key=lambda x: x.line_number if x.line_number is not None else -1)
+        for finding in findings:
+            print(
+                f"- [{finding.rule_id}] Line {finding.line_number}: {finding.message} ({finding.rule_title}: {finding.status})")
+        print("")  # empty line
+
+    return failure_found
 
 
 if __name__ == '__main__':
