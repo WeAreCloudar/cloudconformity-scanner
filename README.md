@@ -2,7 +2,12 @@
 This tool allows you to run the CloudConformity Template Scanner from the command line
 
 ## Usage
-You will need to have the `CLOUDCONFORMITY_API_KEY` environment variable set.
+You will need to have the `CLOUDCONFORMITY_API_KEY` environment variable set or create
+`~/.cloudconformity-scanner/config.yaml` with contents similar to this:
+
+```yaml
+api_key: CC_API_KEY
+```
 
 Run `cloudconformity-scanner [file_name]` to scan `file_name`. If no file is give, `template.yaml`
 is used.

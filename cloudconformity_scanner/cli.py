@@ -14,13 +14,23 @@ RISK_LEVELS = [
     "MEDIUM",
     "LOW",
 ]
-CONFIG_FILE = '.cloudconformity-scanner-config.yaml'
-
+LOCAL_CONFIG_FILE = '.cloudconformity-scanner-config.yaml'
+HOME_CONFIG_FILE = os.path.join(os.path.expanduser("~"), '.cloudconformity-scanner', 'config.yaml')
+API_KEY_ENV_VAR = "CLOUDCONFORMITY_API_KEY"
 
 def main():
-    api_key = os.environ.get('CLOUDCONFORMITY_API_KEY')
+    if os.path.isfile(HOME_CONFIG_FILE):
+        yaml = YAML()
+        with open(HOME_CONFIG_FILE, 'r') as fh:
+            home_config = yaml.load(fh)
+    else:
+        home_config = {}
+
+    api_key = os.environ.get(API_KEY_ENV_VAR, home_config.get('api_key'))
     if api_key is None:
-        print("Please configure the CLOUDCONFORMITY_API_KEY environment variable", file=sys.stderr)
+        print("No api key found.", file=sys.stderr)
+        print(f"Please configure the {API_KEY_ENV_VAR} environment variable", file=sys.stderr)
+        print(f"Or add 'api_key: ...' to {HOME_CONFIG_FILE}", file=sys.stderr)
         exit(os.EX_CONFIG)
 
     parser = argparse.ArgumentParser(description="Scan CloudFormation template with CloudConformity")
@@ -36,7 +46,7 @@ def main():
         print("You cannot use --account-id and --profile-id at the same time")
         exit(os.EX_USAGE)
 
-    config_file = args.config if args.config else CONFIG_FILE
+    config_file = args.config if args.config else LOCAL_CONFIG_FILE
     if os.path.isfile(config_file):
         yaml = YAML()
         with open(config_file, 'r') as fh:
