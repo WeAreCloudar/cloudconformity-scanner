@@ -1,0 +1,5 @@
+- id: cloudconformity-scanner
+  name: CloudConformity Template Scanner
+  entry: cloudconformity-scanner
+  language: python
+  files: \.(json|yaml|yml|template)$
