@@ -6,7 +6,7 @@ You will need to have the `CLOUDCONFORMITY_API_KEY` environment variable set or 
 `~/.cloudconformity-scanner/config.yaml` with contents similar to this:
 
 ```yaml
-api_key: CC_API_KEY
+api_key: CLOUDCONFORMITY_API_KEY
 ```
 
 Run `cloudconformity-scanner [file_name]` to scan `file_name`. If no file is give, `template.yaml`
@@ -20,9 +20,9 @@ option.
 
 Example:
 ```yaml
-account_id: CC_ACCOUNT_ID
-profile_id: CC_PROFILE_ID
-region: CC_REGION
+account_id: CLOUDCONFORMITY_ACCOUNT_ID
+profile_id: CLOUDCONFORMITY_PROFILE_ID
+region: CLOUDCONFORMITY_REGION
 exclude_levels:
   - MEDIUM
 exclude_rules:
